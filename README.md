@@ -1,4 +1,6 @@
 # Dehashed Query and Crack
+Note: This script fetches maximum dumps in a single run by default, Added 'size=10000' to fetch more results, consuming 1 credit per query.
+
 1: <b>dehashed.py</b> is a  <a href="https://dehashed.com">dehashed.com</a> query tool which only queries 'domain' as of now. It will output the gathered cleartext passwords and hashes to a file.
 
 2: <b>hash_crack.py</b> will send all the specified hashes to <a href="https://hashes.com">hashes.com</a> in attempt to crack the hash. It will then return all cracked passwords.
