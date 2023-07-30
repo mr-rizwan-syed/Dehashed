@@ -1,15 +1,14 @@
 import json
 import requests
 import argparse
-import requests
 from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 from time import sleep
 import os
 import sys
 
-dehashed_api_key = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' #Hardcode API key if you so choose
-dehashed_username = 'XXXXXXXXXXXXXXXXXXX' #Hardcode email if you so choose
+dehashed_api_key = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' # Hardcode API key if you so choose
+dehashed_username = 'XXXXXXXXXXXXXXXXXXX' # Hardcode email if you so choose
 dehashed_default = 'dehashed'
 
 parser = argparse.ArgumentParser()
@@ -28,14 +27,14 @@ args = parser.parse_args()
 
 def check_api_auth_success(dehashed_json_raw):
     check_success = json.loads(dehashed_json_raw)
-    if check_success.get('success') == False:
+    if not check_success.get('success', False):
         sys.exit('[-] API Authentication Failure.')
     else:
         pass
 
 def query_dehashed_domain():
-    headers = {'Accept': 'application/json',}
-    params = (('query', 'domain:' + args.domain),)
+    headers = {'Accept': 'application/json'}
+    params = {'query': f'domain:{args.domain}', 'size': 10000} # Add 'size=10000' to fetch more results per query
     dehashed_json_raw = requests.get('https://api.dehashed.com/search',
                             headers=headers,
                             params=params,
@@ -49,69 +48,65 @@ def jsonify_data(json_raw_data):
     entries = json_data['entries']
     return entries
 
-def filter_entries():
+def filter_entries(entries):
+    password_combos = []
+    hash_combos = []
     for entry in entries:
         email = entry['email']
-        # username = entry['username']
         password = entry['password']
-        hash = entry['hashed_password']
+        hash_value = entry['hashed_password']
         if len(password) >= 1:
-            combo = email,password
+            combo = email, password
             password_combos.append(combo)
-        elif len(hash) >= 1:
-            combo = email,hash
+        elif len(hash_value) >= 1:
+            combo = email, hash_value
             hash_combos.append(combo)
         else:
             pass
+    return password_combos, hash_combos
 
-def output():
+def output(password_combos, hash_combos):
     print('[+] Cleartext Passwords {email:password}')
-    bool = False
-    try:
-        cracked=open(args.dehashed_file + '_cracked.txt', 'a') #These are set to false by default in case user does not want to save output to file
-        hashes=open(args.dehashed_file + '_hashes.txt', 'a')
-        bool = True
-    except Exception as e:
-        print('[-] Did not save.')
     for combo in password_combos:
-        combo_raw = combo[0] + ':' + combo[1]
+        combo_raw = f'{combo[0]}:{combo[1]}'
         print(combo_raw)
-        try:
-            cracked.write(combo_raw)
-            cracked.write('\n')
-        except Exception as e:
-            pass
-    print('\n\n[+] Hashed Passwords {email:hash}')
+
+    print('\n[+] Hashed Passwords {email:hash}')
     for combo in hash_combos:
-        combo_raw = combo[0] + ':' + combo[1]
-        try:
-            hashes.write(combo_raw)
-            hashes.write('\n')
-        except Exception as e:
-            pass
+        combo_raw = f'{combo[0]}:{combo[1]}'
         print(combo_raw)
-    print('\n\n[+] Raw Hashes to Copy/Paste then crack >:)')
+
+    print('\n[+] Raw Hashes to Copy/Paste then crack >:)')
     for combo in hash_combos:
         print(combo[1])
-    if bool:
-        print('\n[+] Cracked passwords written to ' + args.dehashed_file + '_cracked.txt')
-        print('[+] Hashes written to ' + args.dehashed_file + '_hashes.txt')
+
+    if args.dehashed_file:
+        try:
+            with open(args.dehashed_file + '_cracked.txt', 'a') as cracked:
+                for combo in password_combos:
+                    cracked.write(f'{combo[0]}:{combo[1]}\n')
+
+            with open(args.dehashed_file + '_hashes.txt', 'a') as hashes:
+                for combo in hash_combos:
+                    hashes.write(f'{combo[0]}:{combo[1]}\n')
+
+            print(f'\n[+] Cracked passwords written to {args.dehashed_file}_cracked.txt')
+            print(f'[+] Hashes written to {args.dehashed_file}_hashes.txt')
+        except Exception as e:
+            print('[-] Failed to save the output.')
     else:
         print('[+] Done!')
 
 def check_data_returned(entries):
-    try:
-        for x in entries:
-            pass
-    except TypeError:
-        sys.exit('[-] No data returned. Probably error in syntax.')
+    if not entries:
+        sys.exit('[-] No data returned. Probably an error in syntax.')
 
 def control_flow():
     if args.dehashed_data_file:
         try:
             print('[+] Parsing Dehashed output file...')
-            json_raw_data = open(args.dehashed_data_file, 'r')
-            json_data = json.loads(json_raw_data.read())
+            with open(args.dehashed_data_file, 'r') as json_raw_data:
+                json_data = json.loads(json_raw_data.read())
             entries = json_data['entries']
             check_data_returned(entries)
             return entries
@@ -126,7 +121,5 @@ def control_flow():
 
 if __name__ == '__main__':
     entries = control_flow()
-    hash_combos = []
-    password_combos = []
-    filter_entries()
-    output()
+    password_combos, hash_combos = filter_entries(entries)
+    output(password_combos, hash_combos)
